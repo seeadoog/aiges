@@ -2,9 +2,8 @@ package service
 
 import (
 	"fmt"
-	"github.com/xfyun/aiges/catch"
-	"github.com/xfyun/aiges/codec"
 	"github.com/xfyun/aiges/conf"
+	"github.com/xfyun/aiges/env"
 	"github.com/xfyun/aiges/frame"
 	"github.com/xfyun/aiges/instance"
 	"github.com/xfyun/aiges/protocol"
@@ -30,6 +29,8 @@ type aiService struct {
 	callbackInit actionInit
 	callbackFini actionFini
 	callbackUser map[usrEvent]actionUser
+
+	Coordinator *aigesUtils.Coordinator
 }
 
 func (srv *aiService) Init(box *xsf.ToolBox) (err error) {
@@ -37,16 +38,6 @@ func (srv *aiService) Init(box *xsf.ToolBox) (err error) {
 	srv.instMngr = &InstMngr
 	// 框架配置初始化
 	if err = conf.Construct(srv.tool.Cfg); err != nil {
-		srv.tool.Log.Errorf(err.Error())
-		return
-	}
-
-	// 异常捕获模块
-	catch.Open(conf.Catch, conf.WrapperDelayDetectPeriod, srv.tool.Log, srv.instMngr.CatchCallBack)
-	defer catch.RecoverHandle()
-
-	// 编解码初始化
-	if err = codec.CodecInit(); err != nil {
 		srv.tool.Log.Errorf(err.Error())
 		return
 	}
@@ -62,9 +53,6 @@ func (srv *aiService) Init(box *xsf.ToolBox) (err error) {
 		return
 	}
 
-	//事件捕获模块获取上报的IP
-	conf.CatchSvcIP = srv.tool.NetManager.GetIp()
-
 	// 服务实例初始化
 	usrDef := make(map[instance.UserEvent]instance.UsrAct)
 	for e, a := range srv.callbackUser {
@@ -78,6 +66,13 @@ func (srv *aiService) Init(box *xsf.ToolBox) (err error) {
 		srv.tool.Log.Errorf(err.Error())
 		return
 	}
+
+	// 如果是python grpc模式需要阻塞下
+	if env.AIGES_PLUGIN_MODE == "python" {
+		srv.Coordinator.ConfChan <- box.Cfg
+		<-srv.Coordinator.ConfChan
+	}
+
 	// wrapper引擎初始化;
 	if srv.callbackInit != nil {
 		code, err := srv.callbackInit(conf.UsrCfgData)
@@ -96,13 +91,12 @@ func (srv *aiService) Init(box *xsf.ToolBox) (err error) {
 }
 
 // 无缝退出下线/;
+
 func (srv *aiService) Finit() error {
 	fmt.Println("aiService.Finit: fini begin!")
 	// 框架逆初始化操作
 	srv.instMngr.Fini()
-	codec.CodecFini()
 
-	catch.Close()
 	storage.RabFini()
 	// wrapper引擎逆初始化
 	if srv.callbackFini != nil {

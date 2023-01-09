@@ -32,11 +32,11 @@ install-goreleaser: ## check license if not exist install go-lint tools
 	$(call go-get-tool,$(GORELEASER_BIN),github.com/goreleaser/goreleaser@v1.6.3)
 
 build:
-	mkdir bin
+	mkdir -p bin
 	$(GOBUILD) -v -o ./bin/AIservice -gcflags "-N -l -c 10" ./main/main.go
 	cp -r ./cgo/library/* ./bin/
 	mkdir -p bin/include
-	cp -ra ./cgo/header/widget/* ./bin/include
+	cp -r ./cgo/header/widget/* ./bin/include
 
 clean:
 	rm -rf bin dist
@@ -58,4 +58,7 @@ build-release: SHELL:=/bin/bash
 build-release: install-goreleaser ## build binaries by default
 	@echo "build sealos bin"
 	$(GORELEASER_BIN) release --timeout=1h  --release-notes=hack/release/Note.md --debug  --rm-dist
+
+proto:
+	protoc  --go_out=./grpc/ --go-grpc_out=require_unimplemented_servers=false:./grpc/ ./grpc/proto/aiges_inner.proto && echo success generated.!!
 

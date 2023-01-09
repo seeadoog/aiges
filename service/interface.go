@@ -4,7 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"github.com/xfyun/aiges/conf"
+	"github.com/xfyun/aiges/httproto"
 	"github.com/xfyun/aiges/instance"
+	ut "github.com/xfyun/aiges/utils"
 	"github.com/xfyun/xsf/server"
 	"github.com/xfyun/xsf/utils"
 	"sync"
@@ -21,7 +23,7 @@ type EngService struct {
 }
 
 /*
-	该接口用于框架初始化,提供框架初始化功能,包括各类系统设置及环境变量设置;
+该接口用于框架初始化,提供框架初始化功能,包括各类系统设置及环境变量设置;
 */
 func (srv *EngService) Init(srvVer string) (errInfo error) {
 	srv.usrVersion = srvVer
@@ -32,10 +34,10 @@ func (srv *EngService) Init(srvVer string) (errInfo error) {
 }
 
 /*
-	该接口用于集成方注册"事件-行为"对, 框架在注册的对应条件发生时,会调用注册的对应方法action;
-	@param et			事件类型：业务初始化|业务逆初始化|用户自定义
-	@param event		事件描述; (仅用户自定义事件需要进行描述,描述规则见"docs")
-	@param action		事件对应的行为;
+该接口用于集成方注册"事件-行为"对, 框架在注册的对应条件发生时,会调用注册的对应方法action;
+@param et			事件类型：业务初始化|业务逆初始化|用户自定义
+@param event		事件描述; (仅用户自定义事件需要进行描述,描述规则见"docs")
+@param action		事件对应的行为;
 */
 func (srv *EngService) Register(event usrEvent, action interface{}) (errInfo error) {
 	switch event {
@@ -72,10 +74,10 @@ func (srv *EngService) Register(event usrEvent, action interface{}) (errInfo err
 }
 
 /*
-	该接口为框架服务运行接口,调用之后框架实际运行进行各类模块初始化/服务初始化/并监听端口接收请求;
-	@note	该接口与RunWithWidget()区别,需要自行服务框架register注册操作;
+该接口为框架服务运行接口,调用之后框架实际运行进行各类模块初始化/服务初始化/并监听端口接收请求;
+@note	该接口与RunWithWidget()区别,需要自行服务框架register注册操作;
 */
-func (srv *EngService) Run() (errInfo error) {
+func (srv *EngService) Run(ch *ut.Coordinator) (errInfo error) {
 	srv.wg.Add(1)
 	go func() {
 		defer func() {
@@ -85,9 +87,12 @@ func (srv *EngService) Run() (errInfo error) {
 		srv.aiInst = aiService{callbackInit: srv.initAction, callbackFini: srv.finiAction, callbackUser: srv.usrActions}
 		//		xsf.AddKillerCheck(SERVICE, &sigClose{srv})
 
+		// 用于控制前面python widget 初始化部分操作，那边需要拿到一些配置后才能初始化
+		srv.aiInst.Coordinator = ch
+
 		if errInfo = srv.xsfInst.Run(xsf.BootConfig{CfgMode: utils.CfgMode(-1),
 			CfgData: xsf.CfgMeta{CfgName: "", Project: "", Group: "", Service: "",
-				Version: srv.usrVersion, CompanionUrl: "", CallBack: conf.Update}}, &srv.aiInst); errInfo != nil {
+				Version: srv.usrVersion, CompanionUrl: "", CallBack: conf.Update}}, httproto.NewServer(&srv.aiInst)); errInfo != nil {
 		}
 	}()
 	srv.wg.Wait()
@@ -95,7 +100,7 @@ func (srv *EngService) Run() (errInfo error) {
 }
 
 /*
-	该接口用于框架逆初始化;
+该接口用于框架逆初始化;
 */
 func (srv *EngService) Fini() {
 	// nothing to do, Fini by `kill aiges`;
@@ -104,7 +109,7 @@ func (srv *EngService) Fini() {
 }
 
 /*
-	该接口用于获取框架版本号
+该接口用于获取框架版本号
 */
 func (srv *EngService) Version() string {
 	return VERSION

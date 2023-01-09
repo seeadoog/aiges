@@ -9,7 +9,6 @@ const (
 	sessGort                 = "sessDelGt"
 	usrCfgName               = "usrCfg"
 	realTimeRlt              = "realTimeRlt"
-	catchSwitch              = "catchOn"
 	httpRetry                = "httpRetry"
 	grayMark                 = "gray"
 	wrapperTrace             = "wrapperTrace"
@@ -18,6 +17,9 @@ const (
 	wrapperDelayDetectPeriod = "wrapperDelayDetectPeriod" //平台判断是否发生卡死的检测周期
 	storageData              = "storageData"
 	asyncRelease             = "asyncRelease"
+
+	// grpc python bin path
+	pythonPluginCmd = "pythonPluginCmd"
 
 	// section flowControl
 	sectionFc = "fc"
